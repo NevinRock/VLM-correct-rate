@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>正确/错误统计器</title>
+  <style>
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0f172a; color: #e5e7eb; font-family: Arial, sans-serif;
+    }
+    .card {
+      background: #1e293b; padding: 20px; border-radius: 12px; width: 320px; text-align: center;
+    }
+    h1 { font-size: 20px; margin-bottom: 16px; }
+    .stats { margin-bottom: 16px; }
+    .stat { margin: 8px 0; font-size: 18px; }
+    .buttons, .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    button {
+      flex: 1; padding: 10px; font-size: 14px; border: none; border-radius: 8px; cursor: pointer;
+    }
+    .ok { background: #22c55e; color: white; }
+    .no { background: #ef4444; color: white; }
+    .undo { background: #3b82f6; color: white; }
+    .reset { background: #6b7280; color: white; }
+    .export { background: #f59e0b; color: white; margin-top: 6px; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>正确 / 错误 统计器</h1>
+    <div class="stats">
+      <div class="stat">正确: <span id="okCount">0</span></div>
+      <div class="stat">错误: <span id="noCount">0</span></div>
+      <div class="stat">总计: <span id="totalCount">0</span></div>
+      <div class="stat">正确率: <span id="accuracy">0%</span></div>
+    </div>
+    <div class="buttons">
+      <button id="okBtn" class="ok">✅ 正确</button>
+      <button id="noBtn" class="no">❌ 错误</button>
+    </div>
+    <div class="row">
+      <button id="undoBtn" class="undo">撤回</button>
+      <button id="resetBtn" class="reset">新开一局</button>
+    </div>
+    <button id="exportBtn" class="export">📥 导出 CSV</button>
+  </div>
+
+  <script>
+    (function(){
+      let ok = 0;
+      let no = 0;
+      const history = [];
+
+      const $ok = document.getElementById('okCount');
+      const $no = document.getElementById('noCount');
+      const $total = document.getElementById('totalCount');
+      const $accuracy = document.getElementById('accuracy');
+      const $okBtn = document.getElementById('okBtn');
+      const $noBtn = document.getElementById('noBtn');
+      const $undo = document.getElementById('undoBtn');
+      const $reset = document.getElementById('resetBtn');
+      const $export = document.getElementById('exportBtn');
+
+      function loadFromStorage(){
+        const saved = JSON.parse(localStorage.getItem('stats'));
+        if(saved){
+          ok = saved.ok || 0;
+          no = saved.no || 0;
+          updateUI();
+        }
+      }
+
+      function saveToStorage(){
+        localStorage.setItem('stats', JSON.stringify({ ok, no }));
+      }
+
+      function updateUI(){
+        $ok.textContent = ok;
+        $no.textContent = no;
+        const total = ok + no;
+        $total.textContent = total;
+        $accuracy.textContent = total === 0 ? '0%' : ((ok / total) * 100).toFixed(1) + '%';
+        $undo.disabled = history.length === 0;
+        saveToStorage();
+      }
+
+      function push(action){
+        history.push(action);
+        if(action === 'ok') ok++;
+        else if(action === 'no') no++;
+        updateUI();
+      }
+
+      function undo(){
+        const last = history.pop();
+        if(!last) return;
+        if(last === 'ok' && ok > 0) ok--;
+        if(last === 'no' && no > 0) no--;
+        updateUI();
+      }
+
+      function resetAll(){
+        if(confirm('确认新开一局？这将清空当前统计。')){
+          ok = 0; no = 0; history.length = 0; updateUI();
+        }
+      }
+
+      function exportCSV(){
+        const total = ok + no;
+        const accuracy = total === 0 ? 0 : ((ok / total) * 100).toFixed(1);
+        const rows = [
+          ['正确', '错误', '总计', '正确率(%)'],
+          [ok, no, total, accuracy]
+        ];
+        let csvContent = rows.map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '统计结果.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      $okBtn.addEventListener('click', () => push('ok'));
+      $noBtn.addEventListener('click', () => push('no'));
+      $undo.addEventListener('click', undo);
+      $reset.addEventListener('click', resetAll);
+      $export.addEventListener('click', exportCSV);
+
+      window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if(key === 'a') { push('ok'); }
+        else if(key === 'd') { push('no'); }
+        else if(key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); }
+      });
+
+      loadFromStorage();
+      updateUI();
+    })();
+  </script>
+</body>
+</html>
